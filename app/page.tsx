@@ -38,6 +38,7 @@ export default function HomePage() {
             src="/gpo-xchange-graphic2.png"
             alt="GPO Xchange Graphic"
             fill
+            sizes="(max-width: 768px) 100vw, 50vw" // บอกเบราว์เซอร์ว่าจอเล็กใช้ 100vw, จอใหญ่ใช้ 50vw
             className="object-cover"
             priority
           />
