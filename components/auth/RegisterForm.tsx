@@ -43,18 +43,11 @@ export function RegisterForm() {
   const labelStyle = "text-xs font-bold text-slate-500 mb-1.5 block tracking-wide";
   const errorStyle = "text-[11px] text-rose-500 mt-1 ml-1 font-semibold flex items-center gap-1";
 
-  return (
-    <div
-      className="min-h-dvh flex items-center justify-center px-4 py-6 md:py-10 relative overflow-hidden"
-      style={{ background: 'linear-gradient(160deg, #eefcf6 0%, #f0f4f8 40%, #eef6fb 100%)' }}
-    >
-      {/* Decorative background blobs */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-30 blur-3xl"
-        style={{ background: 'radial-gradient(circle, #5eead4, transparent)' }} />
-      <div className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] rounded-full opacity-25 blur-3xl"
-        style={{ background: 'radial-gradient(circle, #38bdf8, transparent)' }} />
-      <div className="absolute top-1/3 right-10 w-24 h-24 rounded-full opacity-20 blur-2xl hidden md:block"
-        style={{ background: '#0f5132' }} />
+return (
+  <div className="min-h-dvh flex items-center justify-center px-4 py-6 md:py-10 relative overflow-hidden bg-gradient-to-br from-[#eefcf6] via-[#f0f4f8] to-[#eef6fb]">
+    {/* Decorative background blobs - ปรับให้เหมาะสมกับมือถือ */}
+    <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full opacity-30 blur-3xl bg-[radial-gradient(circle,#5eead4,transparent)]" />
+    <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full opacity-25 blur-3xl bg-[radial-gradient(circle,#38bdf8,transparent)]" />
 
       <div className="w-full max-w-lg mx-auto relative z-10 my-4">
 
