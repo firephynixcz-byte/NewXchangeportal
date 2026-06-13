@@ -1,8 +1,8 @@
+// lib/supabase/server.ts
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export async function createClient() {
-  // ต้อง await cookies() ตรงนี้ครับ!
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -11,14 +11,17 @@ export async function createClient() {
     {
       cookies: {
         get(name: string) {
-          // ตรงนี้กิตใช้ cookieStore.get(name)?.value ได้เลย
           return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set(name, value, options);
+          try {
+            cookieStore.set(name, value, options);
+          } catch (error) {}
         },
         remove(name: string) {
-          cookieStore.delete(name);
+          try {
+            cookieStore.delete(name); // <-- แก้ตรงนี้ครับ ให้เหลือแค่ name
+          } catch (error) {}
         },
       },
     }
