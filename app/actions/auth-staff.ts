@@ -96,6 +96,8 @@ export async function approveStaff(staffId: string) {
     return { success: false, error: "คุณไม่มีสิทธิ์ดำเนินการนี้" };
   }
 
+  // อนุมัติการลงทะเบียน
+  // ตรงนี้ผมเปลี่ยน staffId ให้ตรงกับ parameter ที่รับมาครับ
   const { error } = await supabase
     .from('staff_users')
     .update({ is_approved: true })
