@@ -80,7 +80,7 @@ export async function loginStaffAction(payload: any) {
 }
 
 // --- อนุมัติพนักงาน (ใช้ Session ตรวจสอบสิทธิ์) ---
-export async function approveStaff({ id, managerUsername }: { id: string, managerUsername: string }) {
+export async function approveStaff(staffId: string) {
   const supabase = await createClient();
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('staff_session');
