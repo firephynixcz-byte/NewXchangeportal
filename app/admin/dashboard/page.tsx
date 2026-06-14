@@ -33,7 +33,7 @@ export default function StaffApprovalPage() {
     if (!confirmed) return;
 
     // 2. เรียกใช้ Action พร้อมส่ง username ของ Manager
-    const res = await approveStaff({ id, managerUsername });
+    const res = await approveStaff(id); // ส่งแค่ id เข้าไป
     
     if (res.success) {
       alert("อนุมัติเรียบร้อยแล้ว");
