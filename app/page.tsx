@@ -3,6 +3,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { loginStaffAction } from '@/app/actions/auth-staff';
+// --- Import ฟังก์ชัน Action ที่เราทำไว้ ---
+import { sendOTP, verifyOTP } from '@/app/actions/auth-actions';
 
 export default function HomePage() {
   const router = useRouter();
@@ -19,55 +21,53 @@ export default function HomePage() {
   const isCustomer = activeTab === 'customer';
 
   const handleLogin = async () => {
-    // --- Logic ลูกค้า ---
-    if (isCustomer) {
-      if (!isOtpStep) {
-        if (email && email.includes('@')) {
-          setIsOtpStep(true);
+    setLoadingLogin(true);
+    try {
+      // --- Logic ลูกค้า ---
+      if (isCustomer) {
+        if (!isOtpStep) {
+          // เรียกฟังก์ชันส่ง OTP
+          const res = await sendOTP(email);
+          if (res.success) {
+            setIsOtpStep(true);
+            alert("ส่งรหัสยืนยันไปยังอีเมลของท่านแล้วครับ");
+          } else {
+            alert(res.error || "เกิดข้อผิดพลาดในการส่ง OTP");
+          }
         } else {
-          alert("กรุณากรอกอีเมลให้ถูกต้อง");
+          // เรียกฟังก์ชันยืนยัน OTP
+          const res = await verifyOTP(email, otp);
+          if (res.success) {
+            alert("ยืนยันตัวตนสำเร็จ!");
+            router.push('/welcome'); // พาไปหน้า welcome
+          } else {
+            alert("รหัส OTP ไม่ถูกต้องหรือหมดอายุ");
+          }
         }
-      } else {
-        setLoadingLogin(true);
-        // จำลองการตรวจสอบ OTP
-        setTimeout(() => {
-          setLoadingLogin(false);
-          setIsOtpStep(false);
-          alert("ยืนยัน OTP เรียบร้อย");
-        }, 1500);
+        return;
       }
-      return;
+
+      // --- Logic พนักงาน ---
+      const result = await loginStaffAction({ username: empId, password });
+      if (result.success) {
+        const deptRoutes: Record<string, string> = {
+          'manager': '/admin/manager/staff-approvals',
+          'csr': '/admin/csr/dashboard',
+          'log': '/admin/log/dashboard',
+          'wh': '/admin/wh/dashboard'
+        };
+        
+        const destination = deptRoutes[result.department] || '/dashboard';
+        console.log("ปลายทางที่จะไป:", destination);
+        router.push(destination);
+      } else {
+        alert(result.error || "เข้าสู่ระบบไม่สำเร็จ");
+      }
+    } catch (err) {
+      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+    } finally {
+      setLoadingLogin(false);
     }
-
-// --- Logic พนักงาน ---
-setLoadingLogin(true);
-try {
-  const result = await loginStaffAction({ username: empId, password });
-  if (result.success) {
-    // ปรับ Logic การ Redirect ให้ตรงกับแต่ละ Role ของพนักงานครับ
-    const deptRoutes: Record<string, string> = {
-      'manager': '/admin/manager/staff-approvals',
-      'csr': '/admin/csr/dashboard',
-      'log': '/admin/log/dashboard',
-      'wh': '/admin/wh/dashboard'
-    };
-    
-    // ถ้าไม่มี role ตรงกับที่ตั้งไว้ ให้ไปหน้ากลาง หรือหน้า dashboard เดิม
-    const destination = deptRoutes[result.department] || '/dashboard';
-
-    console.log("ผลลัพธ์จาก Server:", result);
-    console.log("ปลายทางที่จะไป:", destination);
-
-    router.push(destination);
-    
-  } else {
-    alert(result.error || "เข้าสู่ระบบไม่สำเร็จ");
-  }
-} catch (err) {
-  alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-} finally {
-  setLoadingLogin(false);
-}
   };
 
   return (
@@ -153,7 +153,7 @@ try {
                   ) : (
                     <input 
                       value={otp} 
-                      onChange={(e) => setOtp(e.target.value)}
+                      onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
                       maxLength={6} 
                       className="w-full px-4 py-3 text-center tracking-[0.5em] text-lg rounded-xl border-2 border-teal-400 bg-teal-50 focus:outline-none" 
                       placeholder="0 0 0 0 0 0" 

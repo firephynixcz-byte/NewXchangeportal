@@ -2,55 +2,95 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 
-// ดึง Session เพื่อเช็คว่าเป็น CSR
+// ดึง Session เพื่อเช็คว่าเป็น CSR หรือ Manager
 async function getCSRSession() {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('staff_session');
   if (!sessionCookie) throw new Error("ไม่ได้ Login");
   
   const session = JSON.parse(sessionCookie.value);
-  if (session.role !== 'csr' && session.role !== 'manager') {
+  
+  if (session.department !== 'csr' && session.department !== 'manager') {
     throw new Error("คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้");
   }
   return session;
 }
 
-// รวมการดึงข้อมูล Dashboard ไว้ในฟังก์ชันเดียว
 export async function getCSRDashboardData() {
   try {
     await getCSRSession();
     const supabase = await createClient();
     
+    // ดึงลูกค้าที่รออนุมัติ
     const { data: clients, error: clientErr } = await supabase
       .from('clients')
       .select('*')
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
       
+    // ดึงใบงาน
     const { data: requests, error: reqErr } = await supabase
       .from('requests')
-      .select('*');
+      .select(`
+        *,
+        drug_items (*)
+      `)
+      .order('created_at', { ascending: false });
       
-    if (clientErr || reqErr) throw new Error("ดึงข้อมูลพลาด");
+    if (clientErr || reqErr) {
+      throw new Error("ดึงข้อมูลพลาด: " + (clientErr?.message || reqErr?.message));
+    }
     
     return { success: true, clients, requests };
+
   } catch (e: any) {
+    console.error("DEBUG - Catch Error:", e.message);
     return { success: false, error: e.message };
   }
 }
 
-// อนุมัติลงทะเบียนลูกค้า
-export async function approveClient(clientId: string) {
+// ฟังก์ชันรวม: อนุมัติ หรือ ปฏิเสธ ลูกค้า
+export async function reviewClient(clientId: string, action: 'approved' | 'rejected') {
   try {
     await getCSRSession();
     const supabase = await createClient();
     
-    const { error } = await supabase
+    // 1. ดึงข้อมูลลูกค้า
+    const { data: client, error: fetchErr } = await supabase
       .from('clients')
-      .update({ status: 'approved' })
-      .eq('id', clientId);
+      .select('*')
+      .eq('id', clientId)
+      .single();
 
-    return error ? { success: false, error: error.message } : { success: true };
+    if (fetchErr || !client) throw new Error("หาข้อมูลลูกค้าไม่พบ");
+
+    // 2. อัปเดตสถานะในตาราง clients
+    const { error: updateErr } = await supabase
+      .from('clients')
+      .update({ status: action })
+      .eq('id', clientId);
+    
+    if (updateErr) throw updateErr;
+
+    // 3. ถ้าอนุมัติ ให้ insert ข้อมูลไปที่ b2b_customers
+    if (action === 'approved') {
+      const { error: insertErr } = await supabase
+        .from('b2b_customers')
+        .insert({
+          email: client.email,
+          hospital_name: client.hospital_name,
+          phone: client.phone,
+          contact_name: client.contact_name,
+        });
+
+      if (insertErr) throw insertErr;
+    }
+
+    revalidatePath('/admin/csr/dashboard');
+    return { success: true };
+
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -73,7 +113,7 @@ export async function updateRequestStatus(requestId: number, status: string, rem
 
     if (reqError) throw reqError;
 
-    const { error: logError } = await supabase
+    await supabase
       .from('status_logs')
       .insert({
         request_id: requestId,
@@ -82,7 +122,8 @@ export async function updateRequestStatus(requestId: number, status: string, rem
         staff_remark: remark
       });
 
-    return logError ? { success: false, error: logError.message } : { success: true };
+    revalidatePath('/admin/csr/dashboard');
+    return { success: true };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
