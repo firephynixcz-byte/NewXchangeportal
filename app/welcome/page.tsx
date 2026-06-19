@@ -1,13 +1,11 @@
-// app/welcome/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react';
-import { getCustomerSession, logoutCustomer } from '@/app/actions/auth-actions';
-import { useRouter } from 'next/navigation';
+import { getCustomerSession } from '@/app/actions/auth-actions';
+import Link from 'next/link';
 
 export default function WelcomePage() {
   const [customer, setCustomer] = useState<any>(null);
-  const router = useRouter();
 
   useEffect(() => {
     async function loadCustomer() {
@@ -31,7 +29,7 @@ export default function WelcomePage() {
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8 space-y-7">
         
-        {/* ── LOGO & BRAND IDENTITY (ย้ายมาไว้บนสุดตามคำขอ) ── */}
+        {/* ── LOGO & BRAND IDENTITY ── */}
         <div className="flex items-center gap-3 px-2 mb-8">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-sm bg-gradient-to-tr from-[#0f5132] to-[#1a7a45] text-white">🔐</div>
           <div>
@@ -41,10 +39,7 @@ export default function WelcomePage() {
         </div>
 
         {/* ── Welcome Header ── */}
-        <div
-          className="relative overflow-hidden rounded-3xl p-8 text-white shadow-xl"
-          style={{ background: 'linear-gradient(135deg, #0a3d22 0%, #1a7a45 55%, #1a8a6a 100%)' }}
-        >
+        <div className="relative overflow-hidden rounded-3xl p-8 text-white shadow-xl" style={{ background: 'linear-gradient(135deg, #0a3d22 0%, #1a7a45 55%, #1a8a6a 100%)' }}>
           <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-10 bg-white" />
           <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full opacity-10 bg-white" />
           <div className="absolute top-1/2 right-24 w-20 h-20 rounded-full opacity-[0.07] bg-white hidden md:block" />
@@ -73,6 +68,7 @@ export default function WelcomePage() {
 
         {/* ── Action Grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Card: แบบฟอร์ม */}
           <div className="group bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden">
             <div className="p-7">
               <div className="flex items-center gap-3 mb-5">
@@ -82,12 +78,13 @@ export default function WelcomePage() {
                   <p className="text-xs text-slate-400">กรอกแบบฟอร์มได้ที่นี่ ...</p> 
                 </div>
               </div>
-              <button className="w-full py-3.5 rounded-2xl font-bold text-white text-sm shadow-md shadow-teal-100 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200" style={{ background: 'linear-gradient(135deg,#0f5132,#1a7a45)' }}>
+              <Link href="/form" className="w-full py-3.5 rounded-2xl font-bold text-white text-sm shadow-md shadow-teal-100 hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 block text-center" style={{ background: 'linear-gradient(135deg,#0f5132,#1a7a45)' }}>
                 ✏️ เริ่มทำรายการใหม่
-              </button>
+              </Link>
             </div>
           </div>
 
+          {/* Card: Track & Trace */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden">
             <div className="p-7">
               <div className="flex items-center gap-3 mb-5">
@@ -134,7 +131,6 @@ export default function WelcomePage() {
       <footer className="mt-4 py-5 px-6 text-center border-t border-teal-50">
         <p className="text-[11px] text-slate-400">© 2026 <span className="font-bold text-teal-600">GPO Xchange Portal</span> • องค์การเภสัชกรรม สาขาภาคใต้ &nbsp;|&nbsp; 🔒 PDPA Compliant</p>
       </footer>
-
     </div>
   );
 }

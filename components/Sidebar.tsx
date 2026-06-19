@@ -9,7 +9,7 @@ export default function Sidebar({ customer }: { customer: any }) {
   const router = useRouter();
 
   return (
-    <aside className="h-screen flex flex-col p-6 border-r border-teal-50 bg-white/80 backdrop-blur-xl">
+    <aside className="h-full flex flex-col p-6 border-r border-teal-50 bg-white/80 backdrop-blur-xl">
       
 {customer && (
   <div className="relative bg-white border border-slate-100 p-6 rounded-3xl shadow-sm mb-8 overflow-hidden">
