@@ -80,7 +80,7 @@ export default function CSRDashboard() {
       fetchData();
     } else alert('Error: ' + res.error);
   };
-
+  
   const handleUpdateStatus = async (id: number, newStatus: string) => {
   const remark = prompt('ระบุหมายเหตุ:');
   if (remark === null) return;
@@ -92,7 +92,8 @@ export default function CSRDashboard() {
       alert("ไม่พบ Session พนักงาน กรุณาล็อกอินใหม่");
       return;
     }
-
+    
+    type ApiResponse = { success: boolean, error?: string };
     let res;
     // เลือกฟังก์ชันให้ตรงกับ newStatus ที่ส่งมา
     if (newStatus === 'approved') {
@@ -110,7 +111,7 @@ export default function CSRDashboard() {
       alert('อัปเดตสถานะเรียบร้อย');
       fetchData();
     } else {
-      alert('Error: ' + res.error);
+      alert('Error: ' + (res.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'));
     }
   } catch (err) {
     alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
