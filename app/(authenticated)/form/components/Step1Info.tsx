@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ReturnRepository } from '../../../repositories/ReturnRepository';
+import { getCustomerSession } from '@/app/actions/auth-actions';
 
 interface Step1Props {
   next: () => void;
@@ -11,131 +11,206 @@ interface Step1Props {
 }
 
 const TYPES = [
-  { label: 'รับคืนลดหนี้',     icon: '💰' },
-  { label: 'รับคืน Recall',    icon: '⚠️' },
-  { label: 'รับคืนแลกเปลี่ยน', icon: '🔄' },
-  { label: 'อื่นๆ',            icon: '⋯'  },
+  { label: 'รับคืนลดหนี้',     icon: '💰', color: 'emerald' },
+  { label: 'รับคืน Recall',    icon: '⚠️', color: 'amber' },
+  { label: 'รับคืนแลกเปลี่ยน', icon: '🔄', color: 'blue' },
+  { label: 'อื่นๆ',            icon: '⋯',  color: 'slate' },
 ] as const;
 
+// ── Shared UI Helper ───────────────────────────────────────────────────────
+const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+  <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-2 flex items-center gap-1.5">
+    <span className="w-1 h-1 rounded-full bg-slate-300" />
+    {children}
+  </label>
+);
+
+const InfoBox = ({ children }: { children: React.ReactNode }) => (
+  <div className="px-5 py-3.5 rounded-xl bg-gradient-to-br from-slate-50 to-white text-slate-700 font-bold text-sm border border-slate-100 shadow-sm">
+    {children}
+  </div>
+);
+
 export default function Step1Info({ next, updateData }: Step1Props) {
-  const router = useRouter();
   const [selectedType, setSelectedType] = useState('');
   const [otherDetail, setOtherDetail] = useState('');
   const [today, setToday] = useState('');
-  const [docNumber, setDocNumber] = useState('Loading...'); 
+  const [docNumber, setDocNumber] = useState('กำลังโหลด...');
   const [clientData, setClientData] = useState<any>(null);
-  const [customerCode, setCustomerCode] = useState('');
 
-useEffect(() => {
+  useEffect(() => {
     const init = async () => {
-      const supabase = createClient();
-      
-      // ดึงแค่ข้อมูล client โดยตรง (ไม่ต้องเช็ค session ซ้ำที่นี่)
-      // เปลี่ยนไปใช้ getUser() เพื่อเอา email หรือ userId จาก auth provider
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) return; 
+      const session = await getCustomerSession();
+      if (!session) return;
 
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*, b2b_customers(*)')
-        .eq('email', user.email)
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('b2b_customers')
+        .select('*')
+        .eq('id', session.id)
         .single();
-        
-      if (error || !data) {
-        console.error("Client fetch error:", error);
-        return;
-      }
-      
-      setClientData(data);
-      setCustomerCode(data.customer_code || '');
-      
+
+      if (data) setClientData(data);
+
       try {
         const nextNumber = await ReturnRepository.getNextDocNumber();
         setDocNumber(nextNumber);
-      } catch { 
-        setDocNumber("S001/2026"); 
-      }
+      } catch { setDocNumber("S001/2026"); }
     };
+
     init();
     setToday(new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }));
-  }, []); // ลบ [router] ออก เพราะเราไม่ได้ใช้ router แล้ว
+  }, []);
 
   const handleNext = () => {
     if (!selectedType) return alert('กรุณาเลือกประเภทรายการ');
-    if (selectedType === 'อื่นๆ' && !otherDetail.trim()) return alert('กรุณาระบุรายละเอียด');
-    
+    if (selectedType === 'อื่นๆ' && !otherDetail.trim()) return alert('กรุณาระบุรายละเอียดเพิ่มเติม');
+
     updateData((prev: any) => ({
       ...prev,
-      sender: { 
-        ...prev.sender, 
+      sender: {
+        ...prev.sender,
         doc_number: docNumber,
         request_type: selectedType,
         return_reason: selectedType === 'อื่นๆ' ? otherDetail : selectedType,
         hospital_name: clientData?.hospital_name,
-        addr_province: clientData?.province,
-        customer_code: customerCode,
         contact_name: clientData?.contact_name,
-        customer_email: clientData?.email,
+        position: clientData?.position,
         phone: clientData?.phone,
-        department: clientData?.department,
-        b2b_customer_id: clientData?.b2b_customer_id,
-        client_id: clientData?.id
-      },
-      sigFullname: clientData?.contact_name,
-      sigPosition: clientData?.position
+        customer_email: clientData?.email,
+        b2b_customer_id: clientData?.id
+      }
     }));
     next();
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-7">
-        <h2 className="text-sm font-black text-slate-800 mb-6 flex items-center gap-2">
-          <div className="w-1 h-4 bg-teal-600 rounded-full" /> รายละเอียดรายการ
+    <div className="space-y-6 font-sarabun max-w-3xl mx-auto">
+
+      {/* Progress hint */}
+      <div className="flex items-center gap-2 px-1">
+        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-teal-600 text-white text-[11px] font-black">1</span>
+        <p className="text-xs font-bold text-slate-400">ข้อมูลรายการและผู้ประสานงาน</p>
+      </div>
+
+      {/* ══ ประเภทการส่งคืน ══ */}
+      <div className="relative bg-white rounded-3xl border border-slate-100 shadow-md shadow-slate-100/60 p-7 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: 'linear-gradient(90deg,#0f5132,#1a7a45,#2dd4bf)' }} />
+
+        <h2 className="text-sm font-black text-slate-800 mb-6 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-sm" style={{ background: 'linear-gradient(135deg,#d1fae5,#99f6e4)' }}>📦</div>
+          ประเภทการส่งคืน
         </h2>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {TYPES.map((t) => (
-            <button
-              key={t.label} type="button" onClick={() => setSelectedType(t.label)}
-              className={`flex flex-col items-center gap-3 py-6 px-2 rounded-2xl border-2 transition-all ${
-                selectedType === t.label ? 'border-teal-600 bg-teal-50 shadow-md' : 'border-slate-50 bg-slate-50 hover:border-slate-200'
-              }`}
-            >
-              <span className="text-2xl">{t.icon}</span>
-              <span className={`text-[11px] font-black ${selectedType === t.label ? 'text-teal-700' : 'text-slate-500'}`}>{t.label}</span>
-            </button>
-          ))}
+          {TYPES.map((t) => {
+            const active = selectedType === t.label;
+            return (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => setSelectedType(t.label)}
+                className={`relative flex flex-col items-center gap-3 py-6 px-2 rounded-2xl border-2 transition-all duration-200 active:scale-95 ${
+                  active
+                    ? 'border-teal-500 bg-gradient-to-br from-teal-50 to-emerald-50 shadow-lg shadow-teal-100 -translate-y-0.5'
+                    : 'border-transparent bg-slate-50 hover:bg-slate-100 hover:-translate-y-0.5'
+                }`}
+              >
+                {active && (
+                  <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-teal-500 text-white text-[9px] flex items-center justify-center font-black">✓</span>
+                )}
+                <span className={`text-2xl transition-transform duration-200 ${active ? 'scale-110' : ''}`}>{t.icon}</span>
+                <span className={`text-[12px] font-black text-center leading-tight ${active ? 'text-teal-700' : 'text-slate-500'}`}>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
+
+        {/* ช่องพิมพ์เมื่อเลือก อื่นๆ */}
         {selectedType === 'อื่นๆ' && (
-          <div className="mb-6">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">ระบุรายละเอียดเพิ่มเติม</label>
-            <input onChange={(e) => setOtherDetail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-200 outline-none" />
+          <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+            <FieldLabel>ระบุรายละเอียดเพิ่มเติม</FieldLabel>
+            <input
+              type="text"
+              value={otherDetail}
+              onChange={(e) => setOtherDetail(e.target.value)}
+              placeholder="โปรดระบุสาเหตุการส่งคืน..."
+              className="w-full px-5 py-3.5 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm border-2 border-slate-100 focus:bg-white focus:border-teal-400 focus:ring-4 focus:ring-teal-50 outline-none transition-all duration-200"
+            />
           </div>
         )}
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">เลขที่เอกสาร</label>
-            <div className="px-4 py-3 rounded-xl bg-slate-50 text-slate-500 font-medium text-sm border border-slate-100">{docNumber}</div></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">วันที่ทำรายการ</label>
-            <div className="px-4 py-3 rounded-xl bg-slate-50 text-slate-500 font-medium text-sm border border-slate-100">{today}</div></div>
+
+        <div className="grid grid-cols-2 gap-4 pt-1">
+          <div>
+            <FieldLabel>เลขที่เอกสาร</FieldLabel>
+            <InfoBox>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-teal-500">📄</span> {docNumber}
+              </span>
+            </InfoBox>
+          </div>
+          <div>
+            <FieldLabel>วันที่ทำรายการ</FieldLabel>
+            <InfoBox>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-teal-500">📅</span> {today}
+              </span>
+            </InfoBox>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-7">
-        <h2 className="text-sm font-black text-slate-800 mb-6 flex items-center gap-2">
-          <div className="w-1 h-4 bg-teal-600 rounded-full" /> ข้อมูลหน่วยงาน
+      {/* ══ ข้อมูลผู้ประสานงาน ══ */}
+      <div className="relative bg-white rounded-3xl border border-slate-100 shadow-md shadow-slate-100/60 p-7 overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: 'linear-gradient(90deg,#1a5c96,#1a7a45,#0f5132)' }} />
+
+        <h2 className="text-sm font-black text-slate-800 mb-6 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-sm" style={{ background: 'linear-gradient(135deg,#dbeafe,#bfdbfe)' }}>👤</div>
+          ข้อมูลผู้ประสานงาน
+          {!clientData && <span className="ml-auto text-[10px] font-bold text-slate-300 animate-pulse">กำลังโหลด...</span>}
         </h2>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-          <div className="md:col-span-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">ชื่อหน่วยงาน</label>
-            <div className="px-4 py-3 rounded-xl bg-slate-50 text-slate-500 font-medium text-sm border border-slate-100">{clientData?.hospital_name || '...'}</div></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">จังหวัด</label>
-            <div className="px-4 py-3 rounded-xl bg-slate-50 text-slate-500 font-medium text-sm border border-slate-100">{clientData?.province || '...'}</div></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">รหัสลูกค้า (Customer Code)</label>
-            <input value={customerCode} onChange={(e) => setCustomerCode(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-200 outline-none" /></div>
+          <div className="md:col-span-2">
+            <FieldLabel>ชื่อหน่วยงาน (โรงพยาบาล)</FieldLabel>
+            <InfoBox>{clientData?.hospital_name || '...'}</InfoBox>
+          </div>
+          <div>
+            <FieldLabel>ชื่อ-นามสกุล ผู้ประสานงาน</FieldLabel>
+            <InfoBox>{clientData?.contact_name || '-'}</InfoBox>
+          </div>
+          <div>
+            <FieldLabel>ตำแหน่ง</FieldLabel>
+            <InfoBox>{clientData?.position || '-'}</InfoBox>
+          </div>
+          <div>
+            <FieldLabel>เบอร์โทรศัพท์</FieldLabel>
+            <InfoBox>
+              <span className="inline-flex items-center gap-1.5">📞 {clientData?.phone || '-'}</span>
+            </InfoBox>
+          </div>
+          <div>
+            <FieldLabel>อีเมล</FieldLabel>
+            <InfoBox>
+              <span className="inline-flex items-center gap-1.5">✉️ {clientData?.email || '-'}</span>
+            </InfoBox>
+          </div>
         </div>
       </div>
 
-      <button onClick={handleNext} className="w-full py-4 rounded-2xl font-black text-white bg-teal-700 hover:bg-teal-800 transition-all active:scale-[0.98] shadow-lg shadow-teal-200">
-        ดำเนินการต่อ →
+      {/* ══ ปุ่มดำเนินการต่อ ══ */}
+      <button
+        onClick={handleNext}
+        className="group w-full py-4 rounded-2xl font-black text-white text-sm shadow-xl transition-all duration-200 active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-2xl"
+        style={{
+          background: 'linear-gradient(135deg,#0f5132 0%,#1a7a45 60%,#16a085 100%)',
+          boxShadow: '0 12px 28px -8px rgba(26,122,69,0.45)'
+        }}
+      >
+        <span className="flex items-center justify-center gap-2">
+          ดำเนินการต่อ
+          <span className="group-hover:translate-x-1 transition-transform duration-200">→</span>
+        </span>
       </button>
     </div>
   );

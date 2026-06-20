@@ -113,3 +113,10 @@ export async function getPendingStaff() {
 
   return error ? { success: false, error: error.message } : { success: true, data };
 }
+
+export async function getStaffSession() {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get('staff_session'); // คุกกี้ที่พนักงานล็อกอิน
+  if (!sessionCookie) return null;
+  return JSON.parse(sessionCookie.value); // จะได้ object ที่มี id, department, etc.
+}

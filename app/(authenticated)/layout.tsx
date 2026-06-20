@@ -1,5 +1,7 @@
+// app/(authenticated)/layout.tsx
 import Sidebar from '@/components/Sidebar';
 import { getCustomerSession } from '@/app/actions/auth-actions';
+import { redirect } from 'next/navigation';
 
 export default async function AuthenticatedLayout({
   children,
@@ -8,18 +10,25 @@ export default async function AuthenticatedLayout({
 }) {
   const customer = await getCustomerSession();
 
-  return (
-    // เปลี่ยน flex เป็น h-screen และ overflow-hidden เพื่อล็อกไม่ให้หน้าจอรวมเลื่อน
-    <div className="flex h-screen overflow-hidden">
+  // Guard: ถ้าดึง session ไม่ได้ (หมดอายุหรือยังไม่ login) ให้เด้งกลับไปหน้าหลัก
+  if (!customer) {
+    redirect('/');
+  }
+
+return (
+    // ปรับเป็น flex-col ในมือถือ (sm:flex-row)
+    <div className="flex flex-col sm:flex-row h-screen overflow-hidden bg-teal-50">
       
-      {/* 1. Sidebar: ฟิกซ์ไว้ที่ความกว้าง 64 (256px) */}
-      <div className="w-64 flex-shrink-0">
+      {/* 1. Sidebar: ในมือถือให้ซ่อน หรือย่อขนาดลง */}
+      <div className="w-full sm:w-64 flex-shrink-0 bg-white border-b sm:border-b-0 sm:border-r border-slate-200"> 
         <Sidebar customer={customer} />
       </div>
       
-      {/* 2. Main Content: ให้เลื่อนเฉพาะส่วนนี้ */}
-      <main className="flex-1 overflow-y-auto bg-slate-50">
-        {children}
+      {/* 2. Main Content: ในมือถือให้ scroll ได้อิสระ */}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-8"> 
+        <div className="max-w-5xl mx-auto">
+          {children}
+        </div>
       </main>
       
     </div>

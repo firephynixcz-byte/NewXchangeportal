@@ -97,34 +97,109 @@ export async function reviewClient(clientId: string, action: 'approved' | 'rejec
 }
 
 // อัปเดตสถานะใบงาน
-export async function updateRequestStatus(requestId: number, status: string, remark: string) {
-  try {
-    const session = await getCSRSession();
-    const supabase = await createClient();
+export async function approveRequest(requestId: number, staffId: string, remark?: string) {
+  const supabase = await createClient();
 
-    const { error: reqError } = await supabase
-      .from('requests')
-      .update({ 
-        current_status: status, 
-        updated_at: new Date().toISOString(),
-        updated_by: session.id 
-      })
-      .eq('id', requestId);
+  // 1. บันทึกประวัติลง status_logs
+  const { error: logError } = await supabase
+    .from('status_logs')
+    .insert({
+      request_id: requestId,
+      staff_id: staffId,
+      department: 'csr', // ตรงกับค่าในตาราง staff_users
+      status_name: 'approved',
+      staff_remark: remark || 'อนุมัติใบงานเรียบร้อยโดย CSR'
+    });
 
-    if (reqError) throw reqError;
-
-    await supabase
-      .from('status_logs')
-      .insert({
-        request_id: requestId,
-        department: 'csr',
-        status_name: status,
-        staff_remark: remark
-      });
-
-    revalidatePath('/admin/csr/dashboard');
-    return { success: true };
-  } catch (e: any) {
-    return { success: false, error: e.message };
+  if (logError) {
+    console.error("Log Insert Error:", logError);
+    throw new Error("บันทึกประวัติการทำงานไม่สำเร็จ");
   }
+
+  // 2. อัปเดตสถานะในตาราง requests
+  const { error: updateError } = await supabase
+    .from('requests')
+    .update({ 
+      current_status: 'approved',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', requestId);
+
+  if (updateError) {
+    console.error("Request Update Error:", updateError);
+    throw new Error("อัปเดตสถานะใบงานไม่สำเร็จ");
+  }
+
+  return { success: true };
+}
+
+export async function rejectRequest(requestId: number, staffId: string, remark: string) {
+  const supabase = await createClient();
+
+  // 1. บันทึก log สถานะ rejected
+  const { error: logError } = await supabase
+    .from('status_logs')
+    .insert({
+      request_id: requestId,
+      staff_id: staffId,
+      department: 'csr',
+      status_name: 'rejected',
+      staff_remark: remark // บังคับให้ใส่หมายเหตุเวลาปฏิเสธจะดีมากครับ
+    });
+
+  if (logError) throw new Error("บันทึกประวัติการปฏิเสธไม่สำเร็จ");
+
+  // 2. อัปเดตสถานะเป็น rejected
+  await supabase
+    .from('requests')
+    .update({ current_status: 'rejected', updated_at: new Date().toISOString() })
+    .eq('id', requestId);
+
+  return { success: true };
+}
+
+// 6. Stamp กำลังแลกเปลี่ยน (Exchange)
+export async function startExchangeProcess(requestId: number, staffId: string, remark?: string) {
+  const supabase = await createClient();
+
+  // บันทึก Log
+  await supabase.from('status_logs').insert({
+    request_id: requestId,
+    staff_id: staffId,
+    department: 'csr',
+    status_name: 'exchanging',
+    staff_remark: remark || 'เริ่มกระบวนการแลกเปลี่ยนสินค้า'
+  });
+
+  // อัปเดตสถานะ
+  await supabase
+    .from('requests')
+    .update({ current_status: 'exchanging', updated_at: new Date().toISOString() })
+    .eq('id', requestId);
+
+  revalidatePath('/admin/csr/dashboard');
+  return { success: true };
+}
+
+// 7. Stamp งานเสร็จสิ้น (Completed)
+export async function completeRequest(requestId: number, staffId: string, remark?: string) {
+  const supabase = await createClient();
+
+  // บันทึก Log
+  await supabase.from('status_logs').insert({
+    request_id: requestId,
+    staff_id: staffId,
+    department: 'csr',
+    status_name: 'completed',
+    staff_remark: remark || 'งานเสร็จสิ้นเรียบร้อย'
+  });
+
+  // อัปเดตสถานะ
+  await supabase
+    .from('requests')
+    .update({ current_status: 'completed', updated_at: new Date().toISOString() })
+    .eq('id', requestId);
+
+  revalidatePath('/admin/csr/dashboard');
+  return { success: true };
 }

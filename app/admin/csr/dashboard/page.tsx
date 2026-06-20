@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCSRDashboardData, reviewClient, updateRequestStatus } from '@/app/actions/csr-actions';
+import { getCSRDashboardData, reviewClient, approveRequest, startExchangeProcess, completeRequest } from '@/app/actions/csr-actions';
+import { getStaffSession } from '@/app/actions/auth-staff';
 
 // ── Status config ──────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
@@ -81,12 +82,41 @@ export default function CSRDashboard() {
   };
 
   const handleUpdateStatus = async (id: number, newStatus: string) => {
-    const remark = prompt('ระบุหมายเหตุ:');
-    if (remark === null) return;
-    const res = await updateRequestStatus(id, newStatus, remark || '');
-    if (res.success) { alert('อัปเดตสถานะเรียบร้อย'); fetchData(); }
-    else alert('Error: ' + res.error);
-  };
+  const remark = prompt('ระบุหมายเหตุ:');
+  if (remark === null) return;
+
+  try {
+    // กิตต้องดึง ID พนักงานจาก Session ก่อนเสมอ
+    const session = await getStaffSession(); 
+    if (!session?.id) {
+      alert("ไม่พบ Session พนักงาน กรุณาล็อกอินใหม่");
+      return;
+    }
+
+    let res;
+    // เลือกฟังก์ชันให้ตรงกับ newStatus ที่ส่งมา
+    if (newStatus === 'approved') {
+      res = await approveRequest(id, session.id, remark || '');
+    } else if (newStatus === 'exchanging') {
+      res = await startExchangeProcess(id, session.id, remark || '');
+    } else if (newStatus === 'completed') {
+      res = await completeRequest(id, session.id, remark || '');
+    } else {
+      alert('สถานะไม่รู้จัก');
+      return;
+    }
+
+    if (res.success) {
+      alert('อัปเดตสถานะเรียบร้อย');
+      fetchData();
+    } else {
+      alert('Error: ' + res.error);
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    console.error(err);
+  }
+};
 
   // ── Loading ──
   if (isLoading) return (
