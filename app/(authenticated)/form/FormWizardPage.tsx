@@ -17,11 +17,11 @@ const STEPS = [
   { id: 5, label: 'ตรวจสอบ' },
 ];
 
-export default function FormWizardPage(props: any) {
+export default function FormWizardPage({ session }: { session?: any }) { 
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({ 
-    sender: {}, 
+  const [formData, setFormData] = useState({
+    sender: session || {}, // ถ้ามี session ก็ใส่ไป ถ้าไม่มีก็ใช้ {} กันพัง
     items: [], 
     reason: '', 
     signature: null,
