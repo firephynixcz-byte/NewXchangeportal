@@ -1,13 +1,12 @@
 'use client';
 
-import dynamic from 'next/dynamic'; // 1. import ตัวนี้
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCustomerSession } from '@/app/actions/auth-actions';
 
-// 2. ใช้ dynamic import เพื่อไม่ให้โหลดตอน Build
 const FormWizardPage = dynamic(() => import('./FormWizardPage'), {
-  ssr: false, // ปิด SSR สำหรับหน้านี้ไปเลย จะได้ไม่ติดเรื่อง Suspense/Prerender
+  ssr: false,
   loading: () => <div>กำลังโหลดฟอร์ม...</div>
 });
 
