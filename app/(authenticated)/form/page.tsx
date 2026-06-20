@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { getCustomerSession } from '@/app/actions/auth-actions';
 import { redirect } from 'next/navigation';
