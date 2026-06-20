@@ -1,24 +1,29 @@
-import { Suspense } from 'react';
+'use client'; // เปลี่ยนเป็น client component
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getCustomerSession } from '@/app/actions/auth-actions';
-import { redirect } from 'next/navigation';
 import FormWizardPage from './FormWizardPage';
 
-// สร้าง Wrapper Component เพื่อจัดการ Async ตรงนี้
-async function FormWrapper() {
-  const session = await getCustomerSession();
-  
-  if (!session) {
-    redirect('/login');
-  }
-
-  // ส่ง session ไปให้ FormWizardPage หากกิตต้องการใช้งานข้อมูล Session
-  return <FormWizardPage session={session} />;
-}
-
 export default function Page() {
-  return (
-    <Suspense fallback={<div>กำลังเตรียมแบบฟอร์ม...</div>}>
-      <FormWrapper />
-    </Suspense>
-  );
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    async function checkAuth() {
+      const s = await getCustomerSession();
+      if (!s) {
+        router.push('/login');
+      } else {
+        setSession(s);
+        setLoading(false);
+      }
+    }
+    checkAuth();
+  }, [router]);
+
+  if (loading) return <div>กำลังโหลด...</div>;
+
+  return <FormWizardPage session={session} />;
 }
