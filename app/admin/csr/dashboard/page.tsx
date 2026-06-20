@@ -111,7 +111,7 @@ export default function CSRDashboard() {
       alert('อัปเดตสถานะเรียบร้อย');
       fetchData();
     } else {
-      alert('Error: ' + (res.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'));
+      alert('Error: ' + ((res as any).error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'));
     }
   } catch (err) {
     alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
