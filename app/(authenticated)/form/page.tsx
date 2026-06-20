@@ -1,34 +1,10 @@
-'use client';
+// app/(authenticated)/form/page.tsx
+'use client'; // ยังจำเป็นถ้า FormWizardPage ของกิตเป็น Client Component
 
-import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { getCustomerSession } from '@/app/actions/auth-actions';
-
-const FormWizardPage = dynamic(() => import('./FormWizardPage'), {
-  ssr: false,
-  loading: () => <div>กำลังโหลดฟอร์ม...</div>
-});
+import FormWizardPage from './FormWizardPage';
 
 export default function Page() {
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    async function checkAuth() {
-      const s = await getCustomerSession();
-      if (!s) {
-        router.push('/login');
-      } else {
-        setSession(s);
-        setLoading(false);
-      }
-    }
-    checkAuth();
-  }, [router]);
-
-  if (loading) return <div>กำลังตรวจสอบสิทธิ์...</div>;
-
-  return <FormWizardPage session={session} />;
+  // หน้า Page ตอนนี้ไม่ต้องสนเรื่อง Auth แล้ว เพราะ Layout จัดการให้กิตแล้วครับ
+  // กิตก็แค่ Render ตัว Form เข้าไปตรงๆ เลย
+  return <FormWizardPage />;
 }
