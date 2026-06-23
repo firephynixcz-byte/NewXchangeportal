@@ -96,21 +96,19 @@ export async function reviewClient(clientId: string, action: 'approved' | 'rejec
 export async function approveDrugItem(drugItemId: number, requestId: number, staffId: string, remark?: string) {
   const supabase = await createClient();
 
-  // บันทึก Log: ต้องแน่ใจว่า requestId มีค่า (เพราะตารางบังคับ NOT NULL)
+  // บันทึก Log: ใส่ drug_item_id เข้าไปด้วยครับ
   const { error: logError } = await supabase
     .from('status_logs')
     .insert({
-      request_id: requestId, // ตารางกิตบังคับฟิลด์นี้ ห้ามเป็น null
+      request_id: requestId,
       staff_id: staffId,
       department: 'csr',
       status_name: 'approved',
-      staff_remark: remark || `อนุมัติรายการยา ID: ${drugItemId}`
+      staff_remark: remark || `อนุมัติรายการยา ID: ${drugItemId}`,
+      drug_item_id: drugItemId // <--- เพิ่มตรงนี้ครับ
     });
 
-  if (logError) {
-    console.error("Log Error Details:", logError); // เดี๋ยว Error จะโผล่ใน Console ให้กิตเห็นชัดๆ ครับ
-    throw new Error("บันทึกประวัติการทำงานไม่สำเร็จ");
-  }
+  if (logError) throw new Error("บันทึกประวัติการทำงานไม่สำเร็จ");
 
   // อัปเดตสถานะในตาราง drug_items
   const { error: updateError } = await supabase
@@ -168,7 +166,6 @@ export async function approveRequest(requestId: number, staffId: string, remark?
 export async function rejectDrugItem(drugItemId: number, requestId: number, staffId: string, remark?: string) {
   const supabase = await createClient();
 
-  // 1. บันทึกประวัติการปฏิเสธลง status_logs
   const { error: logError } = await supabase
     .from('status_logs')
     .insert({
@@ -176,12 +173,12 @@ export async function rejectDrugItem(drugItemId: number, requestId: number, staf
       staff_id: staffId,
       department: 'csr',
       status_name: 'rejected',
-      staff_remark: remark || `ปฏิเสธรายการยา ID: ${drugItemId}`
+      staff_remark: remark || `ปฏิเสธรายการยา ID: ${drugItemId}`,
+      drug_item_id: drugItemId // <--- เพิ่มตรงนี้ครับ
     });
 
   if (logError) throw new Error("บันทึกประวัติการปฏิเสธไม่สำเร็จ");
 
-  // 2. อัปเดตสถานะยาเป็น 'rejected'
   const { error: updateError } = await supabase
     .from('drug_items')
     .update({ current_status: 'rejected' })
@@ -195,16 +192,76 @@ export async function rejectDrugItem(drugItemId: number, requestId: number, staf
 
 export async function rejectRequest(requestId: number, staffId: string, remark: string) {
   const supabase = await createClient();
-  await supabase.from('status_logs').insert({ request_id: requestId, staff_id: staffId, department: 'csr', status_name: 'rejected', staff_remark: remark });
+
+  // 1. บันทึก Log หลักของใบงาน (ตามที่กิตทำไว้)
+  await supabase.from('status_logs').insert({ 
+    request_id: requestId, 
+    staff_id: staffId, 
+    department: 'csr', 
+    status_name: 'rejected', 
+    staff_remark: remark 
+  });
+
+  // 2. ดึงไอเทมทั้งหมดมาเพื่อบันทึก Log รายชิ้น (แนะนำเพิ่มตรงนี้)
+  const { data: items } = await supabase.from('drug_items').select('id').eq('request_id', requestId);
+  if (items && items.length > 0) {
+    const logs = items.map(i => ({
+      request_id: requestId,
+      drug_item_id: i.id, // บันทึกให้รู้ว่ายาชิ้นนี้โดน Reject ตามใบงานไปด้วย
+      staff_id: staffId,
+      department: 'csr',
+      status_name: 'rejected',
+      staff_remark: `ใบงานถูกปฏิเสธ: ${remark}`
+    }));
+    await supabase.from('status_logs').insert(logs);
+  }
+
+  // 3. อัปเดตสถานะหลักและไอเทมทั้งหมด (ตามที่กิตทำไว้)
   await supabase.from('requests').update({ current_status: 'rejected', updated_at: new Date().toISOString() }).eq('id', requestId);
   await supabase.from('drug_items').update({ current_status: 'rejected' }).eq('request_id', requestId);
+  
+  revalidatePath('/admin/csr/dashboard');
   return { success: true };
 }
 
 export async function startExchangeProcess(requestId: number, staffId: string, remark?: string) {
   const supabase = await createClient();
-  await supabase.from('status_logs').insert({ request_id: requestId, staff_id: staffId, department: 'csr', status_name: 'exchanging', staff_remark: remark || 'เริ่มกระบวนการแลกเปลี่ยนสินค้า' });
-  await supabase.from('requests').update({ current_status: 'exchanging', updated_at: new Date().toISOString() }).eq('id', requestId);
+
+  // 1. ดึงไอเทมทั้งหมดที่ยังไม่ใช่ rejected มาทำ Log
+  const { data: items } = await supabase
+    .from('drug_items')
+    .select('id, current_status')
+    .eq('request_id', requestId);
+
+  const activeItems = items?.filter(i => i.current_status !== 'rejected') ?? [];
+
+  // 2. บันทึก Log รายชิ้น (ตามที่เราคุยกัน)
+  const logs = activeItems.map(item => ({
+    request_id: requestId,
+    drug_item_id: item.id,
+    staff_id: staffId,
+    department: 'csr',
+    status_name: 'exchanging',
+    staff_remark: remark || 'เริ่มกระบวนการแลกเปลี่ยนสินค้า'
+  }));
+
+  if (logs.length > 0) {
+    await supabase.from('status_logs').insert(logs);
+  }
+
+  // 3. อัปเดตสถานะใบงานหลัก
+  await supabase
+    .from('requests')
+    .update({ current_status: 'exchanging', updated_at: new Date().toISOString() })
+    .eq('id', requestId);
+
+  // 4. *** เพิ่มตรงนี้: อัปเดตสถานะรายการยาเป็น exchanging ด้วย ***
+  await supabase
+    .from('drug_items')
+    .update({ current_status: 'exchanging' })
+    .eq('request_id', requestId)
+    .neq('current_status', 'rejected'); // ไม่ยุ่งกับอันที่ reject ไปแล้ว
+
   revalidatePath('/admin/csr/dashboard');
   return { success: true };
 }

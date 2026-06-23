@@ -40,17 +40,29 @@ export async function updateLogisticsStatus(
   staffId: string,
   newStatus: 'in_transit' | 'at_warehouse',
   remark: string
-): Promise<{ success: boolean; error?: string }> { // ✅ เพิ่ม Return Type ตรงนี้
+): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 
-  // 1. บันทึก Log
-  await supabase.from('status_logs').insert({
+  // 1. ดึงรายการยาของใบงานนี้มาทั้งหมด
+  const { data: items } = await supabase
+    .from('drug_items')
+    .select('id')
+    .eq('request_id', requestId);
+
+  // 2. บันทึก Log แยกรายรายการยา (Loop) 
+  // วิธีนี้จะทำให้ drug_item_id ไม่เป็น null อีกต่อไปครับ!
+  const logs = items?.map(item => ({
     request_id: requestId,
     staff_id: staffId,
     department: 'logistics',
     status_name: newStatus,
-    staff_remark: remark
-  });
+    staff_remark: remark,
+    drug_item_id: item.id // <--- ใส่ id ของยาเข้าไปทุกแถว
+  })) || [];
+
+  if (logs.length > 0) {
+    await supabase.from('status_logs').insert(logs);
+  }
 
   // 2. อัปเดตตาราง requests
   await supabase
@@ -130,7 +142,8 @@ export async function updateItemStatus(
     staff_id: staffId,
     department: 'logistics',
     status_name: nextStatus,
-    staff_remark: remark
+    staff_remark: remark,
+    drug_item_id: itemId // <--- ใส่ได้เลยครับ เพราะเรารู้ itemId อยู่แล้ว
   });
 
   revalidatePath('/admin/logistics/dashboard');
@@ -189,7 +202,8 @@ export async function rejectItemStatus(
     staff_id: staffId,
     department: 'logistics',
     status_name: 'rejected',
-    staff_remark: remark || `ปฏิเสธรายการยา ID: ${itemId}`
+    staff_remark: remark || `ปฏิเสธรายการยา ID: ${itemId}`,
+    drug_item_id: itemId // <--- เพิ่มตรงนี้ครับ
   });
 
   revalidatePath('/admin/logistics/dashboard');
@@ -213,7 +227,8 @@ export async function confirmLogisticsBatch(
       staff_id: staffId,
       department: 'logistics',
       status_name: action.status,
-      staff_remark: action.remark
+      staff_remark: action.remark,
+      drug_item_id: action.itemId // <--- เพิ่มตรงนี้ครับ
     });
   }
 
